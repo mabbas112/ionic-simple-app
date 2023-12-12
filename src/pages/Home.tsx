@@ -1,6 +1,5 @@
-import MessageListItem from '../components/MessageListItem';
+
 import { useState } from 'react';
-import { Message, getMessages } from '../data/messages';
 import {
   IonContent,
   IonHeader,
@@ -10,18 +9,37 @@ import {
   IonRefresherContent,
   IonTitle,
   IonToolbar,
-  useIonViewWillEnter
+  useIonViewWillEnter,
+  useIonLoading
 } from '@ionic/react';
 import './Home.css';
+import Users from '../services/http/Users';
+import { User } from '../type/UserType';
+import UserItem from '../components/User';
 
 const Home: React.FC = () => {
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [present, dismiss] = useIonLoading();
+
+  const getUsers = async () => {
+    present({
+      message: 'Wait! we are fetching results for you.',
+      spinner: 'lines-sharp'
+    });
+    try {
+      const response = await Users.getUsers('token', { results: 100 });
+      setUsers(response?.results)
+      dismiss();
+    } catch (err) {
+      console.log("Error while fetching users", err)
+      dismiss();
+    }
+  }
 
   useIonViewWillEnter(() => {
-    const msgs = getMessages();
-    setMessages(msgs);
-  });
+    getUsers();
+  }, []);
 
   const refresh = (e: CustomEvent) => {
     setTimeout(() => {
@@ -29,28 +47,36 @@ const Home: React.FC = () => {
     }, 3000);
   };
 
+  const deleteHandler = (user: User) => {
+    setUsers((preState: User[]) => {
+      return (
+        preState?.filter((item: User) => {
+          const { id: { name, value } } = item;
+          return name !== user?.id?.name && value !== user?.id?.value
+        })
+      );
+    })
+  }
+
   return (
     <IonPage id="home-page">
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Inbox</IonTitle>
+          <IonTitle color="secondary">Users</IonTitle>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
         <IonRefresher slot="fixed" onIonRefresh={refresh}>
           <IonRefresherContent></IonRefresherContent>
         </IonRefresher>
-
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">
-              Inbox
-            </IonTitle>
-          </IonToolbar>
-        </IonHeader>
-
         <IonList>
-          {messages.map(m => <MessageListItem key={m.id} message={m} />)}
+          {
+            users?.map((u: User) => <UserItem
+              key={u.email}
+              user={u}
+              deleteHandler={() => deleteHandler(u)}
+            />)
+          }
         </IonList>
       </IonContent>
     </IonPage>
